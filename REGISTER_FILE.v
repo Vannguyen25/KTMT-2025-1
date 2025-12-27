@@ -11,11 +11,11 @@ module Register_File (
 
 	output wire [31:0] read_data_1,
     output wire [31:0] read_data_2,
-	output wire not_equal,
+	output wire equal,
 );
 
     reg [31:0] regs [0:31];
-    not_equal = 1'b0;
+    equal = 1'b0;
     integer i;
 
     always @(posedge clk or posedge reset) begin
@@ -34,7 +34,25 @@ module Register_File (
     assign read_data_1 = (rs_addr == 0) ? 32'b0 : regs[rs_addr];
     assign read_data_2 = (rt_addr == 0) ? 32'b0 : regs[rt_addr];
 
-	if (read_data_1 != read_data_2) begin
-		not_equal = 1'b1;
+	if (read_data_1 == read_data_2) begin
+		equal = 1'b1;
 	end  
+endmodule
+
+
+module SignExtend (
+    input  [15:0] in, // 16 bit thấp của lệnh
+    output [31:0] out
+);
+    // Lấy bit dấu (bit 15) đắp vào 16 bit cao
+    assign out = {{16{in[15]}}, in};
+endmodule
+
+
+// Dịch trái 2 bit (thêm 00 vào cuối)
+module ShiftLeft2 (
+    input  [31:0] in,
+    output [31:0] out
+);
+    assign out = {in[29:0], 2'b00};
 endmodule

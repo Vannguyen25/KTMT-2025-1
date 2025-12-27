@@ -4,7 +4,7 @@ module control_unit (
 
     // --- OUTPUTS ---
     output reg       reg_dst,     // 0: rt, 1: rd
-    output reg       alu_src_in,     // 0: Reg, 1: Imm
+    output reg       alu_src,     // 0: Reg, 1: Imm
     output reg       mem_to_reg,  // 0: ALU, 1: Mem
     output reg       reg_write,   // 1: Enable Write Reg
     output reg       mem_read,    // 1: Enable Read Mem
