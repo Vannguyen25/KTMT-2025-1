@@ -6,8 +6,7 @@ module MUX_HAZARD_CONTROL (
     // 
     input wire       reg_dst_in,
     input wire       alu_src_in,
-    input wire [1:0] alu_op_in,
-    input wire       branch_in,
+    input wire [2:0] alu_op_in,
     input wire       mem_read_in,
     input wire       mem_write_in,
     input wire       reg_write_in,
@@ -15,27 +14,22 @@ module MUX_HAZARD_CONTROL (
     input wire       jump_in,
 
     // --- OUTPUTS: Tín hiệu đi tiếp (Vào thanh ghi ID/EX) ---
-    // Nếu stall = 1, tất cả outputs sẽ bằng 0
-    output wire       reg_dst_out,
-    output wire       alu_src_out,
-    output wire [1:0] alu_op_out,
-    output wire       branch_out,
-    output wire       mem_read_out,
-    output wire       mem_write_out,
-    output wire       reg_write_out,
-    output wire       mem_to_reg_out,
-    output wire       jump_out
+    output wire       reg_dst,
+    output wire       alu_src,
+    output wire [2:0] alu_op,
+    output wire       mem_read,
+    output wire       mem_write,
+    output wire       reg_write,
+    output wire       mem_to_reg
 );
 
     
-    assign reg_dst_out    = (stall) ? 1'b0 : reg_dst_in;
-    assign alu_src_out    = (stall) ? 1'b0 : alu_src_in;
-    assign alu_op_out     = (stall) ? 2'b00 : alu_op_in; 
-    assign branch_out     = (stall) ? 1'b0 : branch_in;
-    assign mem_read_out   = (stall) ? 1'b0 : mem_read_in;
-    assign mem_write_out  = (stall) ? 1'b0 : mem_write_in; 
-    assign reg_write_out  = (stall) ? 1'b0 : reg_write_in; 
-    assign mem_to_reg_out = (stall) ? 1'b0 : mem_to_reg_in;
-    assign jump_out       = (stall) ? 1'b0 : jump_in;
+    assign reg_dst    = (stall) ? 1'b0 : reg_dst_in;
+    assign alu_src    = (stall) ? 1'b0 : alu_src_in;
+    assign alu_op     = (stall) ? 3'b000 : alu_op_in; 
+    assign mem_read   = (stall) ? 1'b0 : mem_read_in;
+    assign mem_write  = (stall) ? 1'b0 : mem_write_in; 
+    assign reg_write  = (stall) ? 1'b0 : reg_write_in; 
+    assign mem_to_reg = (stall) ? 1'b0 : mem_to_reg_in;
 
 endmodule

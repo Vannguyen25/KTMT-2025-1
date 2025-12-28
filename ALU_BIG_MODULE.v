@@ -1,147 +1,160 @@
-module ALU_CONTROL (
-    input  wire [2:0] ALU_Op,
-    input  wire [5:0] Funct,
-    output wire [2:0] ALU_Sel
-);
-    // Params
-    
-    localparam Add = 3'b000; // for lw, sw
-    localparam Sub = 3'b001; // for beq
-    localparam R_Type = 3'b010; // R-type instructions
-    localparam I_Type = 3'b011; // lw, sw, beq
-
-    localparam ALU_Add = 3'b000;
-    localparam ALU_Sub = 3'b001;
-    localparam ALU_And = 3'b010;
-    localparam ALU_Or = 3'b011;
-    localparam ALU_Xor = 3'b100;
-
-    always @(*) begin
-        case (ALU_Op)
-            R_Type: begin // Rtype instructions
-                case (Funct) // cần xác nhận lại các mã funct
-                    6'h20: ALU_Sel = ALU_Add; // add 
-                    6'h22: ALU_Sel = ALU_Sub; // sub
-                    6'h24: ALU_Sel = ALU_And; // and
-                    6'h25: ALU_Sel = ALU_Or;  // or
-                    6'h26: ALU_Sel = ALU_Xor; // xor
-                    default: ALU_Sel = 3'b000; // default to add
-                endcase
-            end
-            I_Type: begin // lw, sw, beq
-                ALU_Sel = ALU_Add; // for lw, sw
-            end
-            Add: begin
-                ALU_Sel = ALU_Add;
-            end
-            Sub: begin
-                ALU_Sel = ALU_Sub; // CONTROL UNIT cmt slti cần xử lí opcode trong ALU CONTROL?
-            end
-            default: begin
-                ALU_Sel = 3'b000; // default to add
-            end
-        endcase
-    end
-
-endmodule
-
-module ALU (
-    input  wire [31:0] ALU_In_0,
-    input  wire [31:0] ALU_In_1,
-    input  wire [2:0] ALU_Sel,
-    output wire [31:0] ALU_Out
-
-);
-    localparam ALU_Add = 3'b000;
-    localparam ALU_Sub = 3'b001;
-    localparam ALU_And = 3'b010;
-    localparam ALU_Or = 3'b011;
-    localparam ALU_Xor = 3'b100;
-
-    always @(*) begin
-        case (ALU_Sel)
-            ALU_Add: ALU_Out = ALU_In_0 + ALU_In_1;
-            ALU_Sub: ALU_Out = ALU_In_0 - ALU_In_1;
-            ALU_And: ALU_Out = ALU_In_0 & ALU_In_1;
-            ALU_Or: ALU_Out = ALU_In_0 | ALU_In_1;
-            ALU_Xor: ALU_Out = ALU_In_0 ^ ALU_In_1;
-            default: ALU_Out = 32'h00000000;
-        endcase
-    end
-
-endmodule
-
-module MUX #(parameter MUX_INPUT = 2;
-             parameter SEL_INPUT = 1;
-) (
-    input  wire [31:0] MUX_In [MUX_INPUT-1:0],
-    input  wire [SEL_INPUT-1:0] sel,
-    output wire [31:0] MUX_Out
-);
-
-    assign MUX_Out = MUX_In[sel];
-
-endmodule
-
-module ADDER (
-    input  wire [31:0] A,
-    input  wire [31:0] B,
-    output wire [31:0] SUM
-);
-    assign SUM = A + B;
-
-endmodule
-
+// ==========================================
+// MODULE CHÍNH: ALU_BIG_MODULE
+// Giữ nguyên input/output ports như yêu cầu
+// ==========================================
 module ALU_BIG_MODULE (
-    input  wire [1:0] ForwardA,
-    input  wire [1:0] ForwardB,
+    input  wire [1:0]  ForwardA,
+    input  wire [1:0]  ForwardB,
     input  wire [31:0] read_data_1,
     input  wire [31:0] read_data_2,
     input  wire [31:0] EX_MEM_alu_result,
-    input  wire [31:0] MEM_WB_read_data,
-    input  wire [15:0] INSTRUCTION,
-    input  wire [31:0] ALU_src,
-    input  wire [2:0] ALU_Op,
+    input  wire [31:0] MEM_WB_read_data,   // *** LƯU Ý: NÊN NỐI FINAL WRITEBACK DATA Ở TOP ***
+    input  wire [31:0] ins_15_0,           // Immediate đã sign-extend 32-bit
+    input  wire [2:0]  alu_op,
+    input  wire        alu_src,
 
-    output wire [31:0] ALU_Out // = ALU_Result
-    output wire [31:0] ALU_write_data
-
+    output wire [31:0] alu_result,
+    output wire [31:0] write_data
 );
-    
-    wire [31:0] ALU_In_0;
-    wire [31:0] ALU_In_1;
-    wire [2:0] ALU_Sel;
-    wire [31:0] ALU_Out;
 
-    ALU_CONTROL ALU_CONTROL_0 (
-        .ALU_Op(ALU_Op),
-        .Funct(INSTRUCTION[5:0]),
-        .ALU_Sel(ALU_Sel)
+    // --------------------------------------------------------
+    // 1) Forwarding MUX cho input A của ALU
+    // --------------------------------------------------------
+    wire [31:0] alu_in_a;
+    assign alu_in_a =
+        (ForwardA == 2'b10) ? EX_MEM_alu_result :
+        (ForwardA == 2'b01) ? MEM_WB_read_data  :
+                              read_data_1;
+
+    // --------------------------------------------------------
+    // 2) Forwarding MUX cho input B gốc (dùng cho sw / hoặc alu_src=0)
+    // --------------------------------------------------------
+    wire [31:0] forward_b_out;
+    assign forward_b_out =
+        (ForwardB == 2'b10) ? EX_MEM_alu_result :
+        (ForwardB == 2'b01) ? MEM_WB_read_data  :
+                              read_data_2;
+
+    // Dữ liệu store (sw) phải lấy sau forwarding
+    assign write_data = forward_b_out;
+
+    // --------------------------------------------------------
+    // 3) MUX chọn ALU input B: regB hoặc immediate
+    // alu_src = 0 -> dùng register (forward_b_out)
+    // alu_src = 1 -> dùng immediate (ins_15_0)
+    // --------------------------------------------------------
+    wire [31:0] alu_in_b;
+    assign alu_in_b = (alu_src) ? ins_15_0 : forward_b_out;
+
+    // --------------------------------------------------------
+    // 4) ALU CONTROL: tương thích CONTROL_UNIT
+    // - alu_op = 010 => R-type dùng funct
+    // - alu_op = 000 => ADD
+    // - alu_op = 001 => SUB
+    // - alu_op = 011 => I-type (không đủ info để phân biệt -> default ADD)
+    // --------------------------------------------------------
+    wire [2:0] alu_sel_internal;
+    ALU_CONTROL u_alu_ctrl (
+        .ALU_Op  (alu_op),
+        .Funct   (ins_15_0[5:0]),   // ⚠️ chỉ đúng nếu ID/EX giữ đúng funct cho R-type
+        .ALU_Sel (alu_sel_internal)
     );
 
-    ALU ALU_0 (
-        .ALU_In_0(ALU_In_0),
-        .ALU_In_1(ALU_In_1),
-        .ALU_Sel(ALU_Sel),
-        .ALU_Out(ALU_Out)
+    // --------------------------------------------------------
+    // 5) ALU CORE
+    // --------------------------------------------------------
+    ALU u_alu (
+        .ALU_In_0 (alu_in_a),
+        .ALU_In_1 (alu_in_b),
+        .ALU_Sel  (alu_sel_internal),
+        .ALU_Out  (alu_result)
     );
 
-    MUX #(3,2) MUX_A (
-        .MUX_In({read_data_1, MEM_WB_read_data, EX_MEM_alu_result}),
-        .sel(ForwardA),
-        .MUX_Out(ALU_In_0)
-    );
+endmodule
 
-    MUX #(3,2) MUX_B (
-        .MUX_In({read_data_2, MEM_WB_read_data, EX_MEM_alu_result}),
-        .sel(ForwardB),
-        .MUX_Out(ALU_write_data)
-    );
 
-    MUX #(2,1) MUX_ALU_src (
-        .MUX_In({ALU_write_data, {16'h0000, INSTRUCTION[15:0]}}), // coi nhu da sign-extend
-        .sel(ALU_src), // assuming this bit decides between register and immediate
-        .MUX_Out(ALU_In_1)
-    );
+// ==========================================
+// ALU_CONTROL: TƯƠNG THÍCH CONTROL_UNIT
+// ==========================================
+module ALU_CONTROL (
+    input  wire [2:0] ALU_Op,
+    input  wire [5:0] Funct,
+    output reg  [2:0] ALU_Sel
+);
+    // CONTROL_UNIT codes
+    localparam ADD    = 3'b000; // lw, sw, addi
+    localparam SUB    = 3'b001; // beq
+    localparam R_TYPE = 3'b010; // R-type decode funct
+    localparam I_TYPE = 3'b011; // andi/ori/xori/slti/lui (chưa đủ info)
 
+    // ALU select
+    localparam ALU_ADD = 3'b000;
+    localparam ALU_SUB = 3'b001;
+    localparam ALU_AND = 3'b010;
+    localparam ALU_OR  = 3'b011;
+    localparam ALU_XOR = 3'b100;
+
+    always @(*) begin
+        case (ALU_Op)
+
+            R_TYPE: begin
+                // Decode funct chuẩn MIPS
+                case (Funct)
+                    6'h20: ALU_Sel = ALU_ADD; // add
+                    6'h22: ALU_Sel = ALU_SUB; // sub
+                    6'h24: ALU_Sel = ALU_AND; // and
+                    6'h25: ALU_Sel = ALU_OR;  // or
+                    6'h26: ALU_Sel = ALU_XOR; // xor
+                    default: ALU_Sel = ALU_ADD;
+                endcase
+            end
+
+            ADD: begin
+                ALU_Sel = ALU_ADD;
+            end
+
+            SUB: begin
+                ALU_Sel = ALU_SUB;
+            end
+
+            I_TYPE: begin
+                // Do CONTROL_UNIT gom tất cả I-type vào 011,
+                // nhưng ALU_CONTROL không có opcode => không thể phân biệt and/ori/xori/slt/lui
+                // Tạm thời default = ADD để không phá pipeline cơ bản.
+                ALU_Sel = ALU_ADD;
+            end
+
+            default: ALU_Sel = ALU_ADD;
+
+        endcase
+    end
+endmodule
+
+
+// ==========================================
+// ALU CORE
+// ==========================================
+module ALU (
+    input  wire [31:0] ALU_In_0,
+    input  wire [31:0] ALU_In_1,
+    input  wire [2:0]  ALU_Sel,
+    output reg  [31:0] ALU_Out
+);
+
+    localparam ALU_ADD = 3'b000;
+    localparam ALU_SUB = 3'b001;
+    localparam ALU_AND = 3'b010;
+    localparam ALU_OR  = 3'b011;
+    localparam ALU_XOR = 3'b100;
+
+    always @(*) begin
+        case (ALU_Sel)
+            ALU_ADD: ALU_Out = ALU_In_0 + ALU_In_1;
+            ALU_SUB: ALU_Out = ALU_In_0 - ALU_In_1;
+            ALU_AND: ALU_Out = ALU_In_0 & ALU_In_1;
+            ALU_OR : ALU_Out = ALU_In_0 | ALU_In_1;
+            ALU_XOR: ALU_Out = ALU_In_0 ^ ALU_In_1;
+            default: ALU_Out = 32'd0;
+        endcase
+    end
 endmodule

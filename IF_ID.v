@@ -1,16 +1,27 @@
-module IF_ID_Register (
+module FLUSHCONTROL (
+    input  wire jump,
+    input  wire reg_equal_flag,
+    input  wire branch_flag,
+    output wire flush
+);
+
+    assign flush = jump | (reg_equal_flag & branch_flag);  // Cờ flush nếu lệnh nhảy hoặc rẽ nhánh thỏa mãn
+
+endmodule
+
+
+module IF_ID_REGISTER (
     input clk,
     input reset,
     input stall,        // Tín hiệu giữ nguyên trạng thái hazard Unit gửi đến
-    input branch,        // Tín hiệu xóa lệnh từ Control
-    input regis_not_equal, // Nếu 1: Không rẽ nhánh -> nops
+    input flush,        // Tín hiệu xóa lệnh
 
-    input wire [31:0] next_four_add, // lệnh 
-    input wire [31:0] instr_in,      // Lệnh đọc từ memory
+    input wire [31:0] pc_next_in, // lệnh 
+    input wire [31:0] instruction_in,      // Lệnh đọc từ memory
     
   
-    output reg [31:0] next_four_add_out,   
-    output reg [31:0] instr_out
+    output reg [31:0] pc_next,   
+    output reg [31:0] instruction
 );
 	
 	// Khi clock lên dương
@@ -18,36 +29,26 @@ module IF_ID_Register (
     always @(posedge clk or posedge reset) begin
 		// Kiểm tra tín hiệu reset hệ thống
         if (reset) begin
-            next_four_add_out <= 32'b0;
-            instr_out         <= 32'b0;
+            pc_next <= 32'b0;
+            instruction         <= 32'b0;
         end
-        else if (branch && regis_not_equal) begin      // Nếu Noops
-            next_four_add_out <= 32'b0;     // Đẩy 0
-            instr_out         <= 32'b0;     // Đẩy 0
+        else if (flush) begin      // Nếu Noops được yêu cầu
+            pc_next <= 32'b0;     // Đẩy 0
+            instruction         <= 32'b0;     // Đẩy 0
         end
         
         // Kiểm tra tín hiệu stall
         else if (stall) begin
-            next_four_add_out <= next_four_add_out; // Giữ nguyên trạng thái hiện tại 
-            instr_out         <= instr_out;         // Giữ nguyên trạng thái hiện tại
+            pc_next <= pc_next; // Giữ nguyên trạng thái hiện tại
+            instruction         <= instruction;         // Giữ nguyên trạng thái hiện tại
         end
         
         // Trường hợp thông thường
         else begin
-            next_four_add_out <= next_four_add; // <-- Nạp từ input mới
-            instr_out         <= instr_in;
+            pc_next <= pc_next_in; // <-- Nạp từ input mới
+            instruction         <= instruction_in;
         end
     end
 
 endmodule
 
-module Sign_Extend (
-    input  wire [15:0] imm_in,  // Input 16 bit (Immediate)
-    output wire [31:0] imm_out  // Output 32 bit
-);
-
-    // Cú pháp: { {số_lần_lặp {bit_cần_lặp}}, dữ_liệu_gốc }
-    // Lấy bit [15] lặp lại 16 lần, sau đó ghép với chính nó
-    assign imm_out = { {16{imm_in[15]}}, imm_in };
-
-endmodule

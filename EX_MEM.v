@@ -1,4 +1,4 @@
-module EX_MEM_Register (
+module EX_MEM_REGISTER (
     input wire clk,
     input wire reset,
     // ========================================================
