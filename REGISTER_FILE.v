@@ -1,46 +1,44 @@
-module Register_File (
-    input wire clk,
-    input wire reset,
-    
-    input wire [4:0] rs_addr,
-    input wire [4:0] rt_addr,
+module REGISTER_FILE (
+    input  wire        clk,
+    input  wire        reset,
+    input  wire [4:0]  rs_addr,
+    input  wire [4:0]  rt_addr,
+    input  wire        reg_write_in,
+    input  wire [4:0]  write_addr,
+    input  wire [31:0] write_data,
 
-    input wire reg_write_en,
-    input wire [4:0] write_addr,
-    input wire [31:0] write_data
-
-	output wire [31:0] read_data_1,
+    output wire [31:0] read_data_1,
     output wire [31:0] read_data_2,
-	output wire equal,
+    output wire        equal
 );
 
     reg [31:0] regs [0:31];
-    equal = 1'b0;
     integer i;
 
+    // Write synchronous + reset
     always @(posedge clk or posedge reset) begin
         if (reset) begin
-            // Reset toàn bộ về 0
-            for (i = 0; i < 32; i = i + 1) begin
+            for (i = 0; i < 32; i = i + 1)
                 regs[i] <= 32'b0;
-            end
-        end
-        else if (reg_write_en && write_addr != 0) begin 
-            regs[write_addr] <= write_data;
+        end else begin
+            if (reg_write_in && (write_addr != 5'd0))
+                regs[write_addr] <= write_data;
+            regs[0] <= 32'b0; // $zero luôn 0
         end
     end
 
+    // Read async
+    assign read_data_1 = regs[rs_addr];
+    assign read_data_2 = regs[rt_addr];
 
-    assign read_data_1 = (rs_addr == 0) ? 32'b0 : regs[rs_addr];
-    assign read_data_2 = (rt_addr == 0) ? 32'b0 : regs[rt_addr];
+    // Equal combinational (KHÔNG dùng generate)
+    assign equal = (read_data_1 == read_data_2);
 
-	if (read_data_1 == read_data_2) begin
-		equal = 1'b1;
-	end  
 endmodule
 
 
-module SignExtend (
+
+module SIGNEXTEND (
     input  [15:0] in, // 16 bit thấp của lệnh
     output [31:0] out
 );
@@ -50,7 +48,7 @@ endmodule
 
 
 // Dịch trái 2 bit (thêm 00 vào cuối)
-module ShiftLeft2 (
+module SHIFTLEFT2 (
     input  [31:0] in,
     output [31:0] out
 );

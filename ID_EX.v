@@ -1,4 +1,4 @@
-module ID_EX_Register (
+module ID_EX_REGISTER (
     input wire clk,
     input wire reset,
 
@@ -7,7 +7,7 @@ module ID_EX_Register (
     // ========================================================
 
     // --- 1. Control Signals: EX Stage (Thực thi) ---
-    input wire       reg_dst,
+    input wire       reg_dst_in,
     input wire [2:0] alu_op_in,      // Đã cập nhật lên 3-bit theo code Control Unit mới nhất
     input wire       alu_src_in,
 

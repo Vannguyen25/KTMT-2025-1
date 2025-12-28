@@ -30,7 +30,7 @@ module PC (
 	end
 endmodule
 
-module Instruction_Memory (
+module INSTRUCTION_MEMORY (
     input  wire [31:0] PC_pc,       // Địa chỉ PC (byte address)
     output wire [31:0] instruction  // Câu lệnh đọc ra
 );
@@ -41,10 +41,10 @@ module Instruction_Memory (
     reg [7:0] memory [0:MEM_SIZE-1];
 
     // Logic đọc Big-Endian (Gộp 4 byte)
-    assign instruction = { memory[PC_pc],      // MSB
-                           memory[PC_pc + 1], 
+    assign instruction = { memory[PC_pc + 3],      // MSB
                            memory[PC_pc + 2], 
-                           memory[PC_pc + 3]   // LSB
+                           memory[PC_pc + 1], 
+                           memory[PC_pc]   // LSB
                          };
 endmodule
 

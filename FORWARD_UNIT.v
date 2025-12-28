@@ -1,4 +1,4 @@
-module FORWARD_UNIT(
+module FORWARDING_UNIT(
     // --- INPUTS ---
     // Các địa chỉ thanh ghi rs, rt giai đoạn sau Decode (ID/EX)
     input wire [4:0] ID_EX_rs,

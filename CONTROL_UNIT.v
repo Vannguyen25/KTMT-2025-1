@@ -1,8 +1,9 @@
-module control_unit (
+module CONTROL_UNIT (
     // --- INPUTS ---
     input wire [5:0] opcode,      // Instruction[31:26]
 
     // --- OUTPUTS ---
+    output reg       pc_src,      // 0: PC + 4, 1: Branch/Jump Target
     output reg       reg_dst,     // 0: rt, 1: rd
     output reg       alu_src,     // 0: Reg, 1: Imm
     output reg       mem_to_reg,  // 0: ALU, 1: Mem
@@ -41,9 +42,9 @@ module control_unit (
         mem_read    = 0;
         mem_write   = 0;
         branch      = 0;
-        branch_ne   = 0;
         jump        = 0;
         alu_op      = 3'b000; 
+        pc_src      = 0;
 
         // --- BƯỚC 2: XÉT TỪNG TRƯỜNG HỢP OPCODE ---
         case (opcode)
@@ -78,11 +79,12 @@ module control_unit (
             // ---------------------------------------------
             beq: begin
                 branch      = 1;      // Bật cờ Branch
-                alu_op      = 3'b001; // ALU làm phép trừ (Sub) để so sánh
+                pc_src      = 1;      // Chọn Branch Target
             end
 
             j: begin
                 jump        = 1;      // Bật cờ Jump
+                pc_src      = 1;      // Chọn Jump Target
             end
             
             // ---------------------------------------------
