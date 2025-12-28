@@ -16,7 +16,7 @@ module REGISTER_FILE (
     integer i;
 
     // Write synchronous + reset
-    always @(posedge clk or posedge reset) begin
+    always @(negedge clk or posedge reset) begin
         if (reset) begin
             for (i = 0; i < 32; i = i + 1)
                 regs[i] <= 32'b0;
