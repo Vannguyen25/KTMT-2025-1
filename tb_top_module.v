@@ -1,20 +1,23 @@
 `timescale 1ns/1ps
-module tb_beq_far;
+module tb_top_module;
 
   reg clk, reset;
   TOP_MODULE dut(.clk(clk), .reset(reset));
 
-  // =======================
-  // DUMP WAVE
-  // =======================
+  integer cycle;
+  integer i;
+
+  // --------------------------------------------------
+  // Dump waveform
+  // --------------------------------------------------
   initial begin
-    $dumpfile("wave_beq_far.vcd");
-    $dumpvars(0, tb_beq_far);
+    $dumpfile("wave_top_module.vcd");
+    $dumpvars(0, tb_top_module);
   end
 
-  // =======================
-  // WRITE INSTRUCTION TO IMEM
-  // =======================
+  // --------------------------------------------------
+  // Task: write 1 instruction into byte-addressable IMEM
+  // --------------------------------------------------
   task write_imem_inst;
     input integer byte_addr;
     input [31:0] inst;
@@ -26,141 +29,123 @@ module tb_beq_far;
     end
   endtask
 
-  integer i;
-  integer cycle;
-
-  // =======================
-  // FORCE NO STALL/FLUSH
-  // =======================
-  initial begin
-    force dut.pc_unit.stall   = 1'b0;
-    force dut.if_id_reg.stall = 1'b0;
-    force dut.if_id_reg.flush = 1'b0;
-  end
-
-  // =======================
-  // INIT + CLOCK START AFTER INIT
-  // =======================
+  // ==================================================
+  // INIT + LOAD PROGRAM + LOAD REGISTERS
+  // ==================================================
   initial begin
     clk   = 0;
     reset = 1;
     cycle = 0;
 
-    // clear imem
-    for (i=0; i<256; i=i+1)
+    // clear IMEM
+    for (i = 0; i < 256; i = i + 1)
       dut.instr_mem.memory[i] = 8'h00;
 
-    // ====================================================
+    // ------------------------------------------------
     // PROGRAM:
-    // 0: addi t0,0,1
-    // 1: addi t1,0,1
-    // 2-7: nop x6
-    // 8: beq t0,t1, +1  (target = PC+4 + 4 = skip next instr)
-    // 9: addi t2,0,99  (should be skipped)
-    // 10: addi t2,0,5  (label)
-    // ====================================================
-    write_imem_inst(0*4,  32'h20080001); // addi t0,0,1
-    write_imem_inst(1*4,  32'h20090002); // addi t1,0,1
+    // 0: add  s1,s2,s3      (s1 = 30)
+    // 1: add  s3,s4,s5      (s3 = 10)
+    // 2: beq  s1,s3,label   (not taken)
+    // 3: addi t0,0,111
+    // 4: addi t0,0,222
+    // 5: label: addi t0,0,5
+    // ------------------------------------------------
 
-    write_imem_inst(2*4,  32'h00000000); // nop
-    write_imem_inst(3*4,  32'h00000000); // nop
-    write_imem_inst(4*4,  32'h00000000); // nop
-    write_imem_inst(5*4,  32'h00000000); // nop
-    write_imem_inst(6*4,  32'h00000000); // nop
-    write_imem_inst(7*4,  32'h00000000); // nop
+  write_imem_inst(0*4, 32'h02538820); // add $s1, $s2, $s3  (s1 = 10 + 20 = 30)
+write_imem_inst(1*4, 32'h02539820); // add $s3, $s2, $s3  (s3 = 10 + 20 = 30) <-- ĐÃ SỬA
+write_imem_inst(2*4, 32'h12330002); // beq $s1, $s3, +2   (30 == 30 -> TAKEN)
+write_imem_inst(3*4, 32'h2008006F); // addi $t0, $zero, 111 (Bị bỏ qua do branch)
+write_imem_inst(4*4, 32'h200800DE); // addi $t0, $zero, 222 (Bị bỏ qua do branch)
+write_imem_inst(5*4, 32'h20080005); // label: addi $t0, $zero, 5 (Đích đến)
 
-    write_imem_inst(8*4,  32'h11090001); // beq t0,t1, +1
-    write_imem_inst(9*4,  32'h200A0063); // addi t2,0,99  (skip if branch taken)
-    write_imem_inst(10*4, 32'h200A0005); // addi t2,0,5    (label)
-
-    // hold reset (no clock)
+    // hold reset a little
     #20;
     reset = 0;
 
-    // init regs after reset (still no clock)
+    // ✅ Load registers BEFORE clock starts
     #1;
-    dut.register_file.regs[8]  = 32'd0; // t0
-    dut.register_file.regs[9]  = 32'd0; // t1
-    dut.register_file.regs[10] = 32'd0; // t2
+    dut.big_register.u_rf.regs[18] = 32'd10;  // s2 = 10
+    dut.big_register.u_rf.regs[19] = 32'd20;  // s3 = 20
+    dut.big_register.u_rf.regs[20] = 32'd3;   // s4 = 3
+    dut.big_register.u_rf.regs[21] = 32'd7;   // s5 = 7
+    dut.big_register.u_rf.regs[17] = 32'd0;   // s1 = 0
+    dut.big_register.u_rf.regs[8]  = 32'd0;   // t0 = 0
 
-    $display(">>> INIT REGS DONE. CLOCK STARTS NOW.");
+    $display("==============================================");
+    $display("INIT DONE: s2=10 s3=20 s4=3 s5=7");
+    $display("EXPECTED: beq NOT taken -> t0 ends = 222");
+    $display("==============================================");
 
-    // start clock
+    // ✅ Start clock AFTER init
     forever #5 clk = ~clk;
   end
 
-  // =======================
-  // DISPLAY EACH CYCLE
-  // =======================
+
+  // ==================================================
+  // DISPLAY EACH CYCLE at negedge (stable signals)
+  // ==================================================
   always @(negedge clk) begin
+    #1;
     cycle = cycle + 1;
 
     $display("--------------------------------------------------");
     $display("CYCLE %0d reset=%b", cycle, reset);
 
-    // IF stage
-    $display("IF : PC=0x%08h  instr_if=0x%08h",
-      dut.pc_unit.PC_pc,
-      dut.instr_mem.instruction
+    $display("IF : PC=0x%08h instr_if=0x%08h pc_next_if=0x%08h",
+      dut.w_pc_cur,
+      dut.w_instr_if,
+      dut.w_pc_next_if
     );
 
-    // ID stage
-    $display("ID : IF/ID.instr=0x%08h pc_next=0x%08h",
-      dut.if_id_reg.instruction,
-      dut.if_id_reg.pc_next
+    $display("ID : IF/ID.instr=0x%08h pc_next_id=0x%08h",
+      dut.w_instr_id,
+      dut.w_pc_next_id
     );
 
-    // decode rs/rt
-    $display("ID decode: opcode=0x%02h rs=%0d rt=%0d imm=0x%04h",
-      dut.if_id_reg.instruction[31:26],
-      dut.if_id_reg.instruction[25:21],
-      dut.if_id_reg.instruction[20:16],
-      dut.if_id_reg.instruction[15:0]
+    $display("ID decode: opcode=0x%02h rs=%0d rt=%0d rd=%0d imm=0x%04h",
+      dut.w_instr_id[31:26],
+      dut.w_instr_id[25:21],
+      dut.w_instr_id[20:16],
+      dut.w_instr_id[15:11],
+      dut.w_instr_id[15:0]
     );
 
-    // RF read
-    $display("RF READ: rd1=0x%08h (%0d)  rd2=0x%08h (%0d)  equal=%b",
-      dut.register_file.read_data_1, dut.register_file.read_data_1,
-      dut.register_file.read_data_2, dut.register_file.read_data_2,
-      dut.register_file.equal
+    $display("RF : rd1=0x%08h (%0d) rd2=0x%08h (%0d) equal=%b",
+      dut.w_rd1, dut.w_rd1,
+      dut.w_rd2, dut.w_rd2,
+      dut.w_equal
     );
 
-    // control signals
-    $display("CTRL: branch=%b jump=%b pc_src=%b",
-      dut.control_unit.branch,
-      dut.control_unit.jump,
-      dut.control_unit.pc_src
+    $display("CTRL: branch=%b jump=%b flush=%b",
+      dut.w_branch_cu,
+      dut.w_jump_cu,
+      dut.w_flush
     );
 
-    // decode target PC
-    $display("DECODE_ADDR: pc_decode=0x%08h", dut.top_decode_addr.pc_decode);
-
-    // mux pc input
-    $display("MUX_PC: pc_in=0x%08h", dut.mux_pc_unit.pc);
-
-    // register values
-    $display("RF REGS: t0=%0d t1=%0d t2=%0d",
-      dut.register_file.regs[8],
-      dut.register_file.regs[9],
-      dut.register_file.regs[10]
+    $display("FINAL: branch_taken=%b pc_src_final=%b pc_decode=0x%08h pc_in=0x%08h",
+      (dut.w_branch_cu & dut.w_equal),
+      (dut.w_jump_cu | (dut.w_branch_cu & dut.w_equal)),
+      dut.w_pc_decode,
+      dut.w_pc_in
     );
 
-    // highlight when BEQ in ID
-    if (dut.if_id_reg.instruction[31:26] == 6'h04) begin
-      $display(">>> BEQ IN ID: t0=%0d t1=%0d equal=%b  branch=%b pc_src=%b",
-        dut.register_file.read_data_1,
-        dut.register_file.read_data_2,
-        dut.register_file.equal,
-        dut.control_unit.branch,
-        dut.control_unit.pc_src
-      );
-    end
-
-    // finish after enough cycles
-    if (cycle == 35) begin
+    $display("REGS: s1=%0d s2=%0d s3=%0d s4=%0d s5=%0d t0=%0d",
+      dut.big_register.u_rf.regs[17],
+      dut.big_register.u_rf.regs[18],
+      dut.big_register.u_rf.regs[19],
+      dut.big_register.u_rf.regs[20],
+      dut.big_register.u_rf.regs[21],
+      dut.big_register.u_rf.regs[8]
+    );
+    $display("STALL: pc_stall=%b IFID_stall=%b mux_control_hazard=%b",
+  dut.w_pc_stall, dut.w_ifid_stall, dut.w_mux_control_hazard
+);
+    if (cycle == 20) begin
       $display("==============================================");
-      $display("EXPECTED: BEQ taken -> t2 = 5 (skip 99)");
-      $display("ACTUAL  : t2 = %0d", dut.register_file.regs[10]);
+      $display("FINAL RESULT:");
+      $display("s1=%0d (expect 30)", dut.big_register.u_rf.regs[17]);
+      $display("s3=%0d (expect 10)", dut.big_register.u_rf.regs[19]);
+      $display("t0=%0d (expect 222)", dut.big_register.u_rf.regs[8]);
       $display("==============================================");
       $finish;
     end

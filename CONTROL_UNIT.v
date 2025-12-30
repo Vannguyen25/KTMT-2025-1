@@ -44,7 +44,6 @@ module CONTROL_UNIT (
         branch      = 0;
         jump        = 0;
         alu_op      = 3'b000; 
-        pc_src      = 0;
 
         // --- BƯỚC 2: XÉT TỪNG TRƯỜNG HỢP OPCODE ---
         case (opcode)
@@ -79,12 +78,10 @@ module CONTROL_UNIT (
             // ---------------------------------------------
             beq: begin
                 branch      = 1;      // Bật cờ Branch
-                pc_src      = 1;      // Chọn Branch Target
             end
 
             j: begin
                 jump        = 1;      // Bật cờ Jump
-                pc_src      = 1;      // Chọn Jump Target
             end
             
             // ---------------------------------------------
@@ -99,8 +96,7 @@ module CONTROL_UNIT (
             slti: begin
                 alu_src     = 1;
                 reg_write   = 1;
-                alu_op      = 3'b011; // Code riêng cho các lệnh I-Type Logic/Compare
-                // Lưu ý: Module ALU Control cần phân biệt slti dựa trên Opcode
+                alu_op      = 3'b001; // Nhóm I-Type So sánh
             end
 
             andi: begin

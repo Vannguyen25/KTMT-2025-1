@@ -44,12 +44,15 @@ module TOP_MODULE (
     // Flush / PC decode
     wire        w_flush;
     wire [31:0] w_pc_decode;
+    wire w_pc_stall_data,  w_ifid_stall_data,  w_mux_hz_data;
+    wire w_pc_stall_ctrl,  w_ifid_stall_ctrl,  w_mux_hz_ctrl;
 
     // Hazard
     wire        w_pc_stall;
     wire        w_ifid_stall;
     wire        w_mux_control_hazard;
-
+    wire [1:0]  w_forwardC;
+    wire [1:0]  w_forwardD;
     // MUX hazard outputs (control vào ID/EX)
     wire        w_reg_dst_hz;
     wire        w_alu_src_hz;
@@ -167,18 +170,31 @@ module TOP_MODULE (
     //-------------------------------------------------------
     // REGISTER_FILE
     //--------------------------------------------------------
-    REGISTER_FILE register_file (
-        .clk          (clk),
-        .reset        (reset),
-        .rs_addr      (w_rs),             // 5 bit
-        .rt_addr      (w_rt),             // 5 bit
-        .reg_write_in (w_reg_write_wb),   // 1 bit (từ WB stage)
-        .write_addr   (w_write_reg_wb),   // 5 bit
-        .write_data   (w_wb_write_data),  // 32 bit
-        .read_data_1  (w_rd1),            // 32 bit
-        .read_data_2  (w_rd2),            // 32 bit
-        .equal        (w_equal)           // 1 bit
-    );
+    BIG_REGISTER big_register(
+    .clk(clk),
+    .reset(reset),
+
+    // địa chỉ đọc (từ IF/ID.instruction)
+    .rs_addr(w_rs),
+    .rt_addr(w_rt),
+
+    // ghi về RF (từ WB stage)
+    .reg_write_in(w_reg_write_wb),
+    .write_addr(w_write_reg_wb),
+    .write_data(w_wb_write_data),
+
+    // forwarding control cho branch comparator (ID stage)
+    .forwardC(w_forwardC),       // cho rs
+    .forwardD(w_forwardD),       // cho rt
+    // data forwarding sources
+    .EX_MEM_value(w_alu_result_mem),   // EX/MEM.alu_result
+    .MEM_WB_value(w_wb_write_data),   // WB.final_write_data
+
+    // output: toán hạng sau forwarding để so sánh
+    .id_op_a(w_rd1),
+    .id_op_b(w_rd2),
+    .equal_after_forward(w_equal)
+);
 
     //-------------------------------------------------------
     // CONTROL_UNIT (pc_src đã xử lý ở đây)
@@ -193,8 +209,7 @@ module TOP_MODULE (
         .mem_write  (w_mem_write_cu),  // 1 bit
         .branch     (w_branch_cu),     // 1 bit
         .jump       (w_jump_cu),       // 1 bit
-        .alu_op     (w_alu_op_cu),     // 3 bits
-        .pc_src     (w_pc_src)         // 1 bit
+        .alu_op     (w_alu_op_cu)    // 3 bits
     );
 
     //--------------------------------------------------------
@@ -229,16 +244,29 @@ module TOP_MODULE (
     //--------------------------------------------------------
     // HAZARD_DETECTION_UNIT
     //--------------------------------------------------------
-    HAZARD_DETECTION_UNIT hazard_detection_unit (
+    DATA_HAZARD_DETECTION_UNIT data_hazard_detection_unit (
         .ID_EX_mem_read     (w_mem_read_ex),   // 1 bit
         .ID_EX_rt           (w_rt_ex),         // 5 bits
         .IF_ID_rs           (w_rs),            // 5 bits
         .IF_ID_rt           (w_rt),            // 5 bits
-        .pc_stall           (w_pc_stall),      // 1 bit
-        .IF_ID_stall        (w_ifid_stall),    // 1 bit
-        .mux_control_hazard (w_mux_control_hazard) // 1 bit
+        .pc_stall           (w_pc_stall_data),      // 1 bit
+        .IF_ID_stall        (w_ifid_stall_data),    // 1 bit
+        .mux_control_hazard (w_mux_hz_data) // 1 bit
     );
 
+    CONTROL_HAZARD_DETECTION_UNIT control_hazard_detection_unit (
+        .branch             (w_branch_cu),     // 1 bit
+        .reg_write          (w_reg_write_ex),  // 1 bit
+        .ID_EX_rd           (w_rd_ex),         // 5 bits
+        .IF_ID_rs           (w_rs),            // 5 bits
+        .IF_ID_rt           (w_rt),            // 5 bits
+        .pc_stall           (w_pc_stall_ctrl),      // 1 bit
+        .IF_ID_stall        (w_ifid_stall_ctrl),    // 1 bit
+        .mux_control_hazard (w_mux_hz_ctrl) // 1 bit
+    );
+    assign w_pc_stall           = w_pc_stall_data | w_pc_stall_ctrl;
+    assign w_ifid_stall         = w_ifid_stall_data | w_ifid_stall_ctrl;
+    assign w_mux_control_hazard = w_mux_hz_data    | w_mux_hz_ctrl;
     //--------------------------------------------------------
     // MUX_HAZARD_CONTROL
     //--------------------------------------------------------
@@ -301,7 +329,7 @@ module TOP_MODULE (
     //---------------------------------------------------------
     // FORWARDING_UNIT
     //---------------------------------------------------------
-    FORWARDING_UNIT forwarding_unit (
+    FORWARDING_UNIT_DATA_HAZARD forwarding_unit_data_hazard (
         .ID_EX_rs        (w_rs_ex),           // 5 bits
         .ID_EX_rt        (w_rt_ex),           // 5 bits
 
@@ -314,7 +342,27 @@ module TOP_MODULE (
         .forwardB        (w_forwardB)         // 2 bits
     );
 
-    //---------------------------------------------------------
+    //--------------------------------------------------------
+    // FORWARDING_UNIT_CONTROL_HAZARD
+    //--------------------------------------------------------
+    FORWARDING_UNIT_CONTROL_HAZARD forwarding_unit_control_hazard (
+        .IF_ID_rs        (w_rs),
+        .IF_ID_rt        (w_rt),
+
+        .EX_MEM_reg_write(w_reg_write_mem),
+        .EX_MEM_rd       (w_write_reg_mem),
+        .MEM_WB_reg_write(w_reg_write_wb),
+        .MEM_WB_rd       (w_write_reg_wb),
+
+        .forwardC        (w_forwardC),
+        .forwardD        (w_forwardD)
+    );
+
+    wire w_branch_taken;
+
+    assign w_branch_taken = w_branch_cu & w_equal;
+    assign w_pc_src = w_jump_cu | w_branch_taken;
+    //--------------------------------------------------------
     // ALU_BIG_MODULE
     //---------------------------------------------------------
     ALU_BIG_MODULE alu_big_module (
@@ -378,6 +426,7 @@ module TOP_MODULE (
         .write_data (w_write_data_mem),  // 32 bits
         .read_data  (w_mem_read_data)    // 32 bits
     );
+
 
     //--------------------------------------------------------
     // MEM_WB_REGISTER

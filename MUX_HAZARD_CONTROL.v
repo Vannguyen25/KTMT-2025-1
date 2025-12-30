@@ -11,7 +11,7 @@ module MUX_HAZARD_CONTROL (
     input wire       mem_write_in,
     input wire       reg_write_in,
     input wire       mem_to_reg_in,
-    input wire       jump_in,
+
 
     // --- OUTPUTS: Tín hiệu đi tiếp (Vào thanh ghi ID/EX) ---
     output wire       reg_dst,
@@ -31,5 +31,6 @@ module MUX_HAZARD_CONTROL (
     assign mem_write  = (stall) ? 1'b0 : mem_write_in; 
     assign reg_write  = (stall) ? 1'b0 : reg_write_in; 
     assign mem_to_reg = (stall) ? 1'b0 : mem_to_reg_in;
+
 
 endmodule
