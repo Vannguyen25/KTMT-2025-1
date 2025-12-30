@@ -7,8 +7,8 @@ module EX (
     input  wire [31:0] read_data_1,
     input  wire [31:0] read_data_2,
     // Dữ liệu từ EX/MEM và MEM/WB để xử lý Forwarding
-    input  wire [1:0]  ForwardA,
-    input  wire [1:0]  ForwardB,
+    input  wire [1:0]  forwardA,
+    input  wire [1:0]  forwardB,
     input  wire [31:0] EX_MEM_alu_result,
     input  wire [31:0] MEM_WB_read_data,   // *** LƯU Ý: NÊN NỐI FINAL WRITEBACK DATA Ở TOP ***
     input  wire [31:0] ins_15_0,           // Immediate đã sign-extend 32-bit
@@ -30,13 +30,13 @@ module EX (
     wire [2:0]  alu_sel;
     
     assign alu_in_a =   // MUX chọn nguồn cho ALU input A nếu có Forwarding
-        (ForwardA == 2'b10) ? EX_MEM_alu_result :
-        (ForwardA == 2'b01) ? MEM_WB_read_data :
+        (forwardA == 2'b10) ? EX_MEM_alu_result :
+        (forwardA == 2'b01) ? MEM_WB_read_data :
                               read_data_1;
 
     assign forward_b_out =  // MUX chọn nguồn cho ALU input B nếu có Forwarding
-        (ForwardB == 2'b10) ? EX_MEM_alu_result :
-        (ForwardB == 2'b01) ? MEM_WB_read_data :
+        (forwardB == 2'b10) ? EX_MEM_alu_result :
+        (forwardB == 2'b01) ? MEM_WB_read_data :
                               read_data_2;
     
     assign write_data = forward_b_out;  // Dữ liệu store (sw) phải lấy sau forwarding

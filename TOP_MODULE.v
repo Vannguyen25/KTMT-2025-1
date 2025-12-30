@@ -7,8 +7,8 @@ module TOP_MODULE (
     wire [31:0] if_instruction;
     wire [31:0] id_pc_next;
     wire [31:0] id_instruction;
-    wire [31:0] id_read_data_1;
-    wire [31:0] id_read_data_2;
+    wire [31:0] id_op_a;
+    wire [31:0] id_op_b;
     wire        id_reg_equal;
     wire        id_reg_dst;
     wire        id_alu_src;
@@ -60,8 +60,10 @@ module TOP_MODULE (
     wire [31:0] final_write_data;
     wire [4:0]  mem_rd;
     wire [4:0]  wb_rd;
-    wire [1:0]  ForwardA;
-    wire [1:0]  ForwardB;
+    wire [1:0]  forwardA;
+    wire [1:0]  forwardB;
+    wire [1:0]  forwardC;
+    wire [1:0]  forwardD;
     wire        pc_stall;
     wire        IF_ID_stall;
     wire        mux_control_hazard;
@@ -104,8 +106,16 @@ module TOP_MODULE (
     .write_addr(wb_write_reg_addr),  // Write address từ WB
     .write_data(wb_read_data),  // Write data từ WB
 
-    .read_data_1(id_read_data_1),
-    .read_data_2(id_read_data_2),
+    // forwarding control cho branch comparator (ID stage)
+    .forwardC(forwardC),       // cho rs
+    .forwardD(forwardD),       // cho rt
+
+    // data forwarding sources
+    .EX_MEM_value(ex_alu_result),   // EX/MEM.alu_result
+    .MEM_WB_value(wb_read_data),   // WB.final_write_data
+
+    .op_a(id_op_a),
+    .op_b(id_op_b),
     .reg_equal(id_reg_equal)
     );
 
@@ -148,8 +158,8 @@ module TOP_MODULE (
     .reg_write_in(hazard_reg_write),
     .mem_to_reg_in(hazard_mem_to_reg),
 
-    .read_data_1_in(id_read_data_1),  // Giá trị thanh ghi Rs
-    .read_data_2_in(id_read_data_2),  // Giá trị thanh ghi Rt
+    .read_data_1_in(id_op_a),  // Giá trị thanh ghi Rs
+    .read_data_2_in(id_op_b),  // Giá trị thanh ghi Rt
     .ins_15_0_in({{16{id_instruction[15]}}, id_instruction[15:0]}),     // Tương ứng ins_15_0 (đã mở rộng dấu)
 
     .rs_in(id_instruction[25:21]),           // Instruction[25:21] - Để xét Forwarding
@@ -190,8 +200,8 @@ module TOP_MODULE (
     .read_data_1(ex_read_data_1),
     .read_data_2(ex_read_data_2),
     // Dữ liệu từ EX/MEM và MEM/WB để xử lý Forwarding
-    .ForwardA(ForwardA),
-    .ForwardB(ForwardB),
+    .forwardA(forwardA),
+    .forwardB(forwardB),
     .EX_MEM_alu_result(mem_alu_result),
     .MEM_WB_read_data(wb_read_data),   // *** LƯU Ý: NÊN NỐI FINAL WRITEBACK DATA Ở TOP ***
     .ins_15_0(ex_ins_15_0),           // Immediate đã sign-extend 32-bit
@@ -292,6 +302,10 @@ FORWARDING_UNIT _forwarding_unit (
     .ID_EX_rs(ex_rs),
     .ID_EX_rt(ex_rt),
 
+    // Các địa chỉ thanh ghi rs, rt giai đoạn sau fetch (IF/ID)
+    .IF_ID_rs(id_instruction[25:21]),
+    .IF_ID_rt(id_instruction[20:16]),
+
     // Thanh ghi rd giai đoạn Execute (EX/MEM) và Memory (MEM/WB)
     .EX_MEM_rd(mem_rd),
     .MEM_WB_rd(wb_rd),
@@ -301,12 +315,17 @@ FORWARDING_UNIT _forwarding_unit (
     .MEM_WB_reg_write(wb_reg_write),
 
 
-    .forwardA(ForwardA),
-    .forwardB(ForwardB)
+    .forwardA(forwardA),
+    .forwardB(forwardB),
+    .forwardC(forwardC),
+    .forwardD(forwardD)  
 );
 
 HAZARD_DETECTION_UNIT _hazard_detection_unit(
     .ID_EX_mem_read(ex_mem_read),
+    .branch(id_branch),
+    .reg_write(ex_reg_write),
+    .ID_EX_rd(ex_rd),
     .ID_EX_rt(ex_rt),
     .IF_ID_rs(id_instruction[25:21]),
     .IF_ID_rt(id_instruction[20:16]),

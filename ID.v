@@ -10,33 +10,60 @@ module REGISTER_FILE (
     input  wire [4:0]  write_addr,  // Write address từ WB
     input  wire [31:0] write_data,  // Write data từ WB
 
-    output wire [31:0] read_data_1,
-    output wire [31:0] read_data_2,
+    // forwarding control cho branch comparator (ID stage)
+    input  wire [1:0]  forwardC,       // cho rs
+    input  wire [1:0]  forwardD,       // cho rt
+
+    // data forwarding sources
+    input  wire [31:0] EX_MEM_value,   // EX/MEM.alu_result
+    input  wire [31:0] MEM_WB_value,   // WB.final_write_data
+
+    output wire [31:0] op_a,
+    output wire [31:0] op_b,
     output wire        reg_equal
 );
 
     reg [31:0] regs [0:31];
     integer i;
 
-    // Write synchronous + reset
-    always @(negedge clk or posedge reset) begin
+    always @(posedge clk) begin
         if (reset) begin
-            for (i = 0; i < 32; i = i + 1)
-                regs[i] <= 32'b0;
-        end else begin
-            if (reg_write && (write_addr != 5'd0))
+            for (i = 0; i < 32; i = i + 1) regs[i] <= 32'b0;
+        end
+        else begin
+            if (reg_write && (write_addr != 5'd0)) begin
                 regs[write_addr] <= write_data;
-            regs[0] <= 32'b0; // $zero luôn 0
+            end
+            regs[0] <= 32'b0;
         end
     end
 
-    // Read async
-    assign read_data_1 = regs[rs_addr];
-    assign read_data_2 = regs[rt_addr];
+    // Tín hiệu trung gian
+    reg [31:0] read_data_1;
+    reg [31:0] read_data_2;
 
-    // Equal combinational (KHÔNG dùng generate)
-    assign reg_equal = (read_data_1 == read_data_2);
+    // ---------------------------------------------------------
+    // READ: negedge (stable cho ID-stage)
+    // ---------------------------------------------------------
+    always @(negedge clk) begin
+        if (reset) begin
+            read_data_1 <= 32'b0;
+            read_data_2 <= 32'b0;
+        end else begin
+            read_data_1 <= regs[rs_addr];
+            read_data_2 <= regs[rt_addr];
+        end
+    end
 
+    // Chọn dữ liệu sau forwarding cho ID stage
+    assign op_a =   (forwardC == 2'b10) ? EX_MEM_value :
+                    (forwardC == 2'b01) ? MEM_WB_value :
+                                        read_data_1;
+    assign op_b =   (forwardD == 2'b10) ? EX_MEM_value :
+                    (forwardD == 2'b01) ? MEM_WB_value :
+                                        read_data_2;
+
+    assign reg_equal = (op_a == op_b);
 endmodule
 
 module CONTROL_UNIT (
