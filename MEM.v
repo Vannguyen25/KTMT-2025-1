@@ -1,10 +1,12 @@
 module DATA_MEMORY (
     input  wire        clk,
     input  wire        reset,
+
     input  wire        mem_write,
     input  wire        mem_read,
     input  wire [31:0] address,
     input  wire [31:0] write_data,
+
     output wire [31:0] read_data
 );
 
@@ -13,10 +15,10 @@ module DATA_MEMORY (
 
     // READ: asynchronous (combinational)
     assign read_data = (reset || !mem_read) ? 32'b0 :
-                       { mem[address + 3],
-                         mem[address + 2],
-                         mem[address + 1],
-                         mem[address] };
+                        {mem[address + 3],
+                        mem[address + 2],
+                        mem[address + 1],
+                        mem[address]};
 
     // WRITE: synchronous tại cạnh âm (negedge)
     always @(negedge clk) begin

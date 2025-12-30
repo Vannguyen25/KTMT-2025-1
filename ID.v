@@ -1,11 +1,14 @@
 module REGISTER_FILE (
     input  wire        clk,
     input  wire        reset,
+    
     input  wire [4:0]  rs_addr,
     input  wire [4:0]  rt_addr,
-    input  wire        reg_write_in,
-    input  wire [4:0]  write_addr,
-    input  wire [31:0] write_data,
+
+
+    input  wire        reg_write,   // Control signal từ WB
+    input  wire [4:0]  write_addr,  // Write address từ WB
+    input  wire [31:0] write_data,  // Write data từ WB
 
     output wire [31:0] read_data_1,
     output wire [31:0] read_data_2,
@@ -36,8 +39,6 @@ module REGISTER_FILE (
 
 endmodule
 
-
-
 module SIGNEXTEND (
     input  [15:0] in, // 16 bit thấp của lệnh
     output [31:0] out
@@ -45,7 +46,6 @@ module SIGNEXTEND (
     // Lấy bit dấu (bit 15) đắp vào 16 bit cao
     assign out = {{16{in[15]}}, in};
 endmodule
-
 
 // Dịch trái 2 bit (thêm 00 vào cuối)
 module SHIFTLEFT2 (
@@ -193,10 +193,10 @@ module CONTROL_UNIT (
 endmodule
 
 module HAZARD_DETECTION_UNIT (
-    input wire ID_EX_mem_read,    
+    input wire ID_EX_mem_read,
     input wire [4:0] ID_EX_rt,    
-    input wire [4:0] IF_ID_rs,    
-    input wire [4:0] IF_ID_rt,    
+    input wire [4:0] IF_ID_rs,
+    input wire [4:0] IF_ID_rt,
 
     output reg pc_stall,          // 1: Dừng PC, 0: PC chạy bình thường
     output reg IF_ID_stall,       // 1: Dừng thanh ghi IF/ID, 0: Ghi bình thường
@@ -204,7 +204,6 @@ module HAZARD_DETECTION_UNIT (
 );
 
     always @(*) begin
-
         pc_stall = 1'b0;           
         IF_ID_stall = 1'b0;        
         mux_control_hazard = 1'b0; 
@@ -225,7 +224,7 @@ module MUX_HAZARD_CONTROL (
     // --- INPUT: Tín hiệu điều khiển (Từ Hazard Detection Unit) ---
     input wire stall,          // 1 = Có xung đột , 0 = Bình thường
 
-    // 
+    // Input từ các tín hiệu điều khiển
     input wire       reg_dst_in,
     input wire       alu_src_in,
     input wire [2:0] alu_op_in,
@@ -303,7 +302,7 @@ module MUX_PC_DECODE (
 
     assign pc_decode = (jump)   ? jump_addr   :
                        (branch) ? branch_addr :
-                                 pc_next;
+                                pc_next;
 
 endmodule
 
@@ -354,5 +353,16 @@ module TOP_DECODE_ADDR (
         .jump        (jump),
         .pc_decode   (pc_decode)
     );
+
+endmodule
+
+module FLUSHCONTROL (
+    input  wire jump,
+    input  wire reg_equal_flag,
+    input  wire branch_flag,
+    output wire flush
+);
+
+    assign flush = jump | (reg_equal_flag & branch_flag);  // Cờ flush nếu lệnh nhảy hoặc rẽ nhánh thỏa mãn
 
 endmodule

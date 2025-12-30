@@ -2,7 +2,7 @@
 // MODULE CHÍNH: ALU_BIG_MODULE
 // Giữ nguyên input/output ports như yêu cầu
 // ==========================================
-module ALU_BIG_MODULE (
+module EX (
     input  wire [1:0]  ForwardA,
     input  wire [1:0]  ForwardB,
     input  wire [31:0] read_data_1,
@@ -13,8 +13,13 @@ module ALU_BIG_MODULE (
     input  wire [2:0]  alu_op,
     input  wire        alu_src,
 
+    input  wire        reg_dst,          // control signal
+    input  wire [4:0]  rt,               // rt field
+    input  wire [4:0]  rd,               // rd field
+
     output wire [31:0] alu_result,
     output wire [31:0] write_data
+    output wire [4:0]  write_reg
 );
 
     // --------------------------------------------------------
@@ -68,10 +73,12 @@ module ALU_BIG_MODULE (
         .ALU_In_1 (alu_in_b),
         .ALU_Sel  (alu_sel_internal),
         .ALU_Out  (alu_result)
+
+    assign write_reg = (reg_dst) ? rd : rt;     // Chọn rd hoặc rt làm địa chỉ ghi
+
     );
 
 endmodule
-
 
 // ==========================================
 // ALU_CONTROL: TƯƠNG THÍCH CONTROL_UNIT
@@ -125,7 +132,6 @@ module ALU_CONTROL (
             end
 
             default: ALU_Sel = ALU_ADD;
-
         endcase
     end
 endmodule
@@ -157,16 +163,5 @@ module ALU (
             default: ALU_Out = 32'd0;
         endcase
     end
-endmodule
-
-module MUX_REG_DST (
-    input  wire        reg_dst,          // control signal
-    input  wire [4:0]  rt,               // rt field
-    input  wire [4:0]  rd,               // rd field
-    output wire [4:0]  final_write_reg   // output selected reg addr
-);
-
-    assign final_write_reg = (reg_dst) ? rd : rt;
-
 endmodule
 
