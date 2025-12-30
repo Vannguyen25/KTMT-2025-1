@@ -1,5 +1,5 @@
-module PC (
-	// 
+module IF (
+
 	input  wire        clk,				// Clock
 	input  wire        reset,			// Reset
 	input  wire        stall,			// Tín hiệu giữ nguyên trạng thái hazard Unit gửi đến
@@ -8,7 +8,7 @@ module PC (
 	input  wire        pc_src,			// Flag chọn nguồn PC
     
     output wire [31:0] pc_next,			// PC + 4
-    output wire [31:0] instruction;  	// Câu lệnh đọc ra đến IF/ID
+    output wire [31:0] instruction  	// Câu lệnh đọc ra đến IF/ID
 );
 
     parameter MEM_SIZE = 1024;			// Khai báo kích thước: 1024 bytes (tương đương 256 lệnh)
@@ -30,17 +30,15 @@ module PC (
 		end
 	end
 	
-	always @(*) begin
-		pc <= (pc_src) ? pc_decode : pc_next; // MUX chọn nguồn PC
+	assign pc = (pc_src) ? pc_decode : pc_next; // MUX chọn nguồn PC
 		
-		pc_next = pc_cur + 4;     // Cộng thêm 4 để lấy lệnh tiếp theo
-    
-		// Logic đọc Big-Endian (Gộp 4 byte)
-    	instruction <= 	{memory[pc_cur + 3],	// 8 bit trái câu lệnh
-                        memory[pc_cur + 2], 
-                        memory[pc_cur + 1], 
-                        memory[pc_cur]			// 8 bit phải câu lệnh
-                        };
-	end
+	assign pc_next = pc_cur + 4;     // Cộng thêm 4 để lấy lệnh tiếp theo
+
+	// Logic đọc Big-Endian (Gộp 4 byte)
+    assign instruction =	{memory[pc_cur + 3],	// 8 bit trái câu lệnh
+                        	memory[pc_cur + 2], 
+                        	memory[pc_cur + 1], 
+                        	memory[pc_cur]			// 8 bit phải câu lệnh
+                        	};
 
 endmodule

@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_beq_far;
+module tb_top_module;
 
   reg clk, reset;
   TOP_MODULE dut(.clk(clk), .reset(reset));
@@ -8,8 +8,8 @@ module tb_beq_far;
   // DUMP WAVE
   // =======================
   initial begin
-    $dumpfile("wave_beq_far.vcd");
-    $dumpvars(0, tb_beq_far);
+    $dumpfile("wave_top.vcd");
+    $dumpvars(0, tb_top_module);
   end
 
   // =======================
@@ -19,10 +19,11 @@ module tb_beq_far;
     input integer byte_addr;
     input [31:0] inst;
     begin
-      dut.instr_mem.memory[byte_addr+0] = inst[7:0];
-      dut.instr_mem.memory[byte_addr+1] = inst[15:8];
-      dut.instr_mem.memory[byte_addr+2] = inst[23:16];
-      dut.instr_mem.memory[byte_addr+3] = inst[31:24];
+      // IF module stores memory as bytes; IF assembles instruction as {mem[pc+3],mem[pc+2],mem[pc+1],mem[pc]}
+      dut._if.memory[byte_addr+0] = inst[7:0];
+      dut._if.memory[byte_addr+1] = inst[15:8];
+      dut._if.memory[byte_addr+2] = inst[23:16];
+      dut._if.memory[byte_addr+3] = inst[31:24];
     end
   endtask
 
@@ -33,9 +34,9 @@ module tb_beq_far;
   // FORCE NO STALL/FLUSH
   // =======================
   initial begin
-    force dut.pc_unit.stall   = 1'b0;
-    force dut.if_id_reg.stall = 1'b0;
-    force dut.if_id_reg.flush = 1'b0;
+    force dut.pc_stall = 1'b0;
+    force dut._if_id_register.stall = 1'b0;
+    force dut._if_id_register.flush = 1'b0;
   end
 
   // =======================
@@ -48,13 +49,13 @@ module tb_beq_far;
 
     // clear imem
     for (i=0; i<256; i=i+1)
-      dut.instr_mem.memory[i] = 8'h00;
+      dut._if.memory[i] = 8'h00;
 
     // ====================================================
     // PROGRAM:
     // 0: addi t0,0,1
     // 1: addi t1,0,1
-    // 2-7: nop x6
+    // 2-7: nop
     // 8: beq t0,t1, +1  (target = PC+4 + 4 = skip next instr)
     // 9: addi t2,0,99  (should be skipped)
     // 10: addi t2,0,5  (label)
@@ -79,9 +80,9 @@ module tb_beq_far;
 
     // init regs after reset (still no clock)
     #1;
-    dut.register_file.regs[8]  = 32'd0; // t0
-    dut.register_file.regs[9]  = 32'd0; // t1
-    dut.register_file.regs[10] = 32'd0; // t2
+    dut._register_file.regs[8]  = 32'd0; // t0
+    dut._register_file.regs[9]  = 32'd0; // t1
+    dut._register_file.regs[10] = 32'd0; // t2
 
     $display(">>> INIT REGS DONE. CLOCK STARTS NOW.");
 
@@ -100,59 +101,56 @@ module tb_beq_far;
 
     // IF stage
     $display("IF : PC=0x%08h  instr_if=0x%08h",
-      dut.pc_unit.PC_pc,
-      dut.instr_mem.instruction
+      dut._if.pc_cur,
+      dut._if.instruction
     );
 
     // ID stage
     $display("ID : IF/ID.instr=0x%08h pc_next=0x%08h",
-      dut.if_id_reg.instruction,
-      dut.if_id_reg.pc_next
+      dut._if_id_register.instruction,
+      dut._if_id_register.pc_next
     );
 
     // decode rs/rt
     $display("ID decode: opcode=0x%02h rs=%0d rt=%0d imm=0x%04h",
-      dut.if_id_reg.instruction[31:26],
-      dut.if_id_reg.instruction[25:21],
-      dut.if_id_reg.instruction[20:16],
-      dut.if_id_reg.instruction[15:0]
+      dut._if_id_register.instruction[31:26],
+      dut._if_id_register.instruction[25:21],
+      dut._if_id_register.instruction[20:16],
+      dut._if_id_register.instruction[15:0]
     );
 
     // RF read
     $display("RF READ: rd1=0x%08h (%0d)  rd2=0x%08h (%0d)  equal=%b",
-      dut.register_file.read_data_1, dut.register_file.read_data_1,
-      dut.register_file.read_data_2, dut.register_file.read_data_2,
-      dut.register_file.equal
+      dut._register_file.read_data_1, dut._register_file.read_data_1,
+      dut._register_file.read_data_2, dut._register_file.read_data_2,
+      dut._register_file.reg_equal
     );
 
     // control signals
     $display("CTRL: branch=%b jump=%b pc_src=%b",
-      dut.control_unit.branch,
-      dut.control_unit.jump,
-      dut.control_unit.pc_src
+      dut.id_branch,
+      dut.id_jump,
+      dut._if.pc    // display internal pc wire from IF instance for reference
     );
 
     // decode target PC
-    $display("DECODE_ADDR: pc_decode=0x%08h", dut.top_decode_addr.pc_decode);
-
-    // mux pc input
-    $display("MUX_PC: pc_in=0x%08h", dut.mux_pc_unit.pc);
+    $display("DECODE_ADDR: pc_decode=0x%08h", dut.id_pc_decode);
 
     // register values
     $display("RF REGS: t0=%0d t1=%0d t2=%0d",
-      dut.register_file.regs[8],
-      dut.register_file.regs[9],
-      dut.register_file.regs[10]
+      dut._register_file.regs[8],
+      dut._register_file.regs[9],
+      dut._register_file.regs[10]
     );
 
     // highlight when BEQ in ID
-    if (dut.if_id_reg.instruction[31:26] == 6'h04) begin
+    if (dut._if_id_register.instruction[31:26] == 6'h04) begin
       $display(">>> BEQ IN ID: t0=%0d t1=%0d equal=%b  branch=%b pc_src=%b",
-        dut.register_file.read_data_1,
-        dut.register_file.read_data_2,
-        dut.register_file.equal,
-        dut.control_unit.branch,
-        dut.control_unit.pc_src
+        dut._register_file.read_data_1,
+        dut._register_file.read_data_2,
+        dut._register_file.reg_equal,
+        dut.id_branch,
+        dut._if.pc
       );
     end
 
@@ -160,7 +158,7 @@ module tb_beq_far;
     if (cycle == 35) begin
       $display("==============================================");
       $display("EXPECTED: BEQ taken -> t2 = 5 (skip 99)");
-      $display("ACTUAL  : t2 = %0d", dut.register_file.regs[10]);
+      $display("ACTUAL  : t2 = %0d", dut._register_file.regs[10]);
       $display("==============================================");
       $finish;
     end

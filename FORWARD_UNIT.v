@@ -13,26 +13,24 @@ module FORWARDING_UNIT(
     input wire MEM_WB_reg_write,
 
 
-    output reg [1:0] forwardA, 
+    output reg [1:0] forwardA,
     output reg [1:0] forwardB
 );
 
     always @(*) begin
-        // =========================================================
-        // 1. LOGIC CHO FORWARD A (Xử lý thanh ghi Rs)
-        // =========================================================
-        // Mặc định: Không Forward (lấy từ ID/EX)
+        // Mặc định không forward
         forwardA = 2'b00; 
+        forwardB = 2'b00;
 
-        if (EX_MEM_reg_write && (EX_MEM_rd != 0) && (EX_MEM_rd == ID_EX_rs)) begin
+        // Forward cho nguồn A
+        if (EX_MEM_reg_write && (EX_MEM_rd != 0) && (EX_MEM_rd == ID_EX_rs)) begin  // Ví dụ: add s3 s1 s2; lw s3 t1 LABEL
             forwardA = 2'b10;
         end
-        else if (MEM_WB_reg_write && (MEM_WB_rd != 0) && (MEM_WB_rd == ID_EX_rs)) begin
+        else if (MEM_WB_reg_write && (MEM_WB_rd != 0) && (MEM_WB_rd == ID_EX_rs)) begin // Ví dụ: add s3 s1 s2; ...; lw s3 t1 LABEL
             forwardA = 2'b01;
         end
 
-        forwardB = 2'b00;
-
+        // Tương tự cho nguồn B
         if (EX_MEM_reg_write && (EX_MEM_rd != 0) && (EX_MEM_rd == ID_EX_rt)) begin
             forwardB = 2'b10;
         end
