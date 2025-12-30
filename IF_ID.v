@@ -32,16 +32,15 @@ module IF_ID_REGISTER (
             pc_next <= 32'b0;
             instruction         <= 32'b0;
         end
+        else if (stall) begin
+            pc_next <= pc_next; // Giữ nguyên trạng thái hiện tại
+            instruction         <= instruction;         // Giữ nguyên trạng thái hiện tại
+        end
         else if (flush) begin      // Nếu Noops được yêu cầu
             pc_next <= 32'b0;     // Đẩy 0
             instruction         <= 32'b0;     // Đẩy 0
         end
         
-        // Kiểm tra tín hiệu stall
-        else if (stall) begin
-            pc_next <= pc_next; // Giữ nguyên trạng thái hiện tại
-            instruction         <= instruction;         // Giữ nguyên trạng thái hiện tại
-        end
         
         // Trường hợp thông thường
         else begin

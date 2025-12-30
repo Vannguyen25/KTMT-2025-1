@@ -257,7 +257,7 @@ module TOP_MODULE (
     CONTROL_HAZARD_DETECTION_UNIT control_hazard_detection_unit (
         .branch             (w_branch_cu),     // 1 bit
         .reg_write          (w_reg_write_ex),  // 1 bit
-        .ID_EX_rd           (w_rd_ex),         // 5 bits
+        .ID_EX_rd           (w_write_reg_ex),         // 5 bits
         .IF_ID_rs           (w_rs),            // 5 bits
         .IF_ID_rt           (w_rt),            // 5 bits
         .pc_stall           (w_pc_stall_ctrl),      // 1 bit
