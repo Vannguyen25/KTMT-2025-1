@@ -62,7 +62,7 @@ module ID_EX_REGISTER (
         if (reset) begin
             // Reset toàn bộ về 0
             reg_dst     <= 0;
-            alu_op    <= 0;
+            alu_op      <= 0;
             alu_src     <= 0;
             
             mem_read    <= 0;
