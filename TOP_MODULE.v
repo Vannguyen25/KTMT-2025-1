@@ -244,29 +244,20 @@ module TOP_MODULE (
     //--------------------------------------------------------
     // HAZARD_DETECTION_UNIT
     //--------------------------------------------------------
-    DATA_HAZARD_DETECTION_UNIT data_hazard_detection_unit (
+    HAZARD_DETECTION_UNIT data_hazard_detection_unit (
         .ID_EX_mem_read     (w_mem_read_ex),   // 1 bit
         .ID_EX_rt           (w_rt_ex),         // 5 bits
         .IF_ID_rs           (w_rs),            // 5 bits
         .IF_ID_rt           (w_rt),            // 5 bits
-        .pc_stall           (w_pc_stall_data),      // 1 bit
-        .IF_ID_stall        (w_ifid_stall_data),    // 1 bit
-        .mux_control_hazard (w_mux_hz_data) // 1 bit
+        .branch             (w_branch_cu),
+        .reg_write          (w_reg_write_ex),
+        .ID_EX_rd           (w_write_reg_ex),
+
+        .pc_stall           (w_pc_stall),      // 1 bit
+        .IF_ID_stall        (w_ifid_stall),    // 1 bit
+        .mux_control_hazard (w_mux_control_hazard) // 1 bit
     );
 
-    CONTROL_HAZARD_DETECTION_UNIT control_hazard_detection_unit (
-        .branch             (w_branch_cu),     // 1 bit
-        .reg_write          (w_reg_write_ex),  // 1 bit
-        .ID_EX_rd           (w_write_reg_ex),         // 5 bits
-        .IF_ID_rs           (w_rs),            // 5 bits
-        .IF_ID_rt           (w_rt),            // 5 bits
-        .pc_stall           (w_pc_stall_ctrl),      // 1 bit
-        .IF_ID_stall        (w_ifid_stall_ctrl),    // 1 bit
-        .mux_control_hazard (w_mux_hz_ctrl) // 1 bit
-    );
-    assign w_pc_stall           = w_pc_stall_data | w_pc_stall_ctrl;
-    assign w_ifid_stall         = w_ifid_stall_data | w_ifid_stall_ctrl;
-    assign w_mux_control_hazard = w_mux_hz_data    | w_mux_hz_ctrl;
     //--------------------------------------------------------
     // MUX_HAZARD_CONTROL
     //--------------------------------------------------------
