@@ -81,55 +81,51 @@ module ALU_CONTROL (
     input  wire [5:0] Funct,
     output reg  [2:0] ALU_Sel
 );
-    // CONTROL_UNIT codes
-    localparam ADD    = 3'b000; // lw, sw, addi
-    localparam SUB    = 3'b001; // beq
-    localparam R_TYPE = 3'b010; // R-type decode funct
-    localparam I_TYPE = 3'b011; // andi/ori/xori/slti/lui (chưa đủ info)
+    // Định nghĩa các mã lệnh nhận từ Control Unit
+    localparam OP_ADD_LW_SW = 3'b000;
+    localparam OP_SUB_BEQ   = 3'b001;
+    localparam OP_R_TYPE    = 3'b010; 
+    localparam OP_ANDI      = 3'b011;
+    localparam OP_ORI       = 3'b100;
+    localparam OP_XORI      = 3'b101;
 
-    // ALU select
-    localparam ALU_ADD = 3'b000;
-    localparam ALU_SUB = 3'b001;
-    localparam ALU_AND = 3'b010;
-    localparam ALU_OR  = 3'b011;
-    localparam ALU_XOR = 3'b100;
+    // Định nghĩa output điều khiển ALU Core (phải khớp module ALU)
+    localparam SEL_ADD = 3'b000;
+    localparam SEL_SUB = 3'b001;
+    localparam SEL_AND = 3'b010;
+    localparam SEL_OR  = 3'b011;
+    localparam SEL_XOR = 3'b100;
 
     always @(*) begin
         case (ALU_Op)
+            // 1. Trường hợp lw, sw, addi -> Phép cộng
+            OP_ADD_LW_SW: ALU_Sel = SEL_ADD;
 
-            R_TYPE: begin
-                // Decode funct chuẩn MIPS
+            // 2. Trường hợp beq -> Phép trừ
+            OP_SUB_BEQ:   ALU_Sel = SEL_SUB;
+
+            // 3. Trường hợp Logic Immediate (andi, ori, xori)
+            OP_ANDI:      ALU_Sel = SEL_AND;
+            OP_ORI:       ALU_Sel = SEL_OR;
+            OP_XORI:      ALU_Sel = SEL_XOR;
+
+            // 4. Trường hợp R-Type -> Phụ thuộc vào Funct
+            OP_R_TYPE: begin
                 case (Funct)
-                    6'h20: ALU_Sel = ALU_ADD; // add
-                    6'h22: ALU_Sel = ALU_SUB; // sub
-                    6'h24: ALU_Sel = ALU_AND; // and
-                    6'h25: ALU_Sel = ALU_OR;  // or
-                    6'h26: ALU_Sel = ALU_XOR; // xor
-                    default: ALU_Sel = ALU_ADD;
+                    6'h20: ALU_Sel = SEL_ADD; // add
+                    6'h22: ALU_Sel = SEL_SUB; // sub
+                    6'h24: ALU_Sel = SEL_AND; // and
+                    6'h25: ALU_Sel = SEL_OR;  // or
+                    6'h26: ALU_Sel = SEL_XOR; // xor
+                    // MIPS chuẩn còn có slt (0x2A), nor (0x27)...
+                    default: ALU_Sel = SEL_ADD; 
                 endcase
             end
 
-            ADD: begin
-                ALU_Sel = ALU_ADD;
-            end
-
-            SUB: begin
-                ALU_Sel = ALU_SUB;
-            end
-
-            I_TYPE: begin
-                // Do CONTROL_UNIT gom tất cả I-type vào 011,
-                // nhưng ALU_CONTROL không có opcode => không thể phân biệt and/ori/xori/slt/lui
-                // Tạm thời default = ADD để không phá pipeline cơ bản.
-                ALU_Sel = ALU_ADD;
-            end
-
-            default: ALU_Sel = ALU_ADD;
-
+            default: ALU_Sel = SEL_ADD;
         endcase
     end
 endmodule
-
 
 // ==========================================
 // ALU CORE
